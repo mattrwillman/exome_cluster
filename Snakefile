@@ -12,11 +12,15 @@ SAMPLES = wildcards.sample
 #    "HILLIARD_S27_L002"
 #]
 
+REF_ACCESSION = config['REF_ACCESSION']
+REF_FASTA = config['REF_FASTA']
+
 rule all:
     input:
         expand("fastqc_out/raw/{sample}_interleaved_fastqc.html", sample = SAMPLES), 
         expand("data/trimmed/{sample}_interleaved.trimmed.fastq", sample = SAMPLES), 
-        expand("fastqc_out/trimmed/{sample}_interleaved.trimmed_fastqc.html", sample = SAMPLES)
+        expand("fastqc_out/trimmed/{sample}_interleaved.trimmed_fastqc.html", sample = SAMPLES), 
+        expand("{accession}.ht21", accession = REF_ACCESSION)
 
 rule fastqc_raw:
     input:
@@ -55,3 +59,14 @@ rule fastqc_trimmed:
         "logs/fastqc_trimmed/{sample}.log"
     shell:
         "fastqc {input} -o {params.outdir} 2> {log}"
+
+rule hisat2_index:
+    input:
+        fasta = REF_FASTA
+    output:
+        "{accession}.ht21"
+    params:
+        accession = REF_ACCESSION
+    threads: 12
+    shell:
+        "hisat2-build -p {threads} {input} {params.accession}"
