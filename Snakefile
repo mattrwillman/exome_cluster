@@ -20,7 +20,7 @@ rule all:
         expand("fastqc_out/raw/{sample}_interleaved_fastqc.html", sample = SAMPLES), 
         expand("data/trimmed/{sample}_interleaved.trimmed.fastq", sample = SAMPLES), 
         expand("fastqc_out/trimmed/{sample}_interleaved.trimmed_fastqc.html", sample = SAMPLES), 
-        expand("{accession}.ht21", accession = REF_ACCESSION)
+        expand("{accession}.{int}.ht21", accession = REF_ACCESSION)
 
 rule fastqc_raw:
     input:
@@ -64,7 +64,7 @@ rule hisat2_index:
     input:
         fasta = REF_FASTA
     output:
-        "{accession}.ht21"
+        "{accession}.{int}.ht21"
     params:
         accession = REF_ACCESSION
     threads: 12
