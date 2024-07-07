@@ -18,9 +18,12 @@ REF_FASTA = config['REF_FASTA']
 rule all:
     input:
         expand("fastqc_out/raw/{sample}_interleaved_fastqc.html", sample = SAMPLES), 
-        expand("data/trimmed/{sample}_interleaved.trimmed.fastq", sample = SAMPLES), 
+        expand("data/trimmed/{sample}.F.trimmed.fastq", sample = SAMPLES), 
+        expand("data/trimmed/{sample}.R.trimmed.fastq", sample = SAMPLES), 
         expand("fastqc_out/trimmed/{sample}_interleaved.trimmed_fastqc.html", sample = SAMPLES), 
-        expand("{accession}.{int}.ht21", accession = REF_ACCESSION)
+        expand("{accession}.{int}.ht21", accession = REF_ACCESSION, int = "1"), 
+        expand("alignment/{sample}.sam", sample = SAMPLES), 
+        expand("samtools_stats/{sample}.txt", sample = SAMPLES)
 
 rule fastqc_raw:
     input:
@@ -36,9 +39,10 @@ rule fastqc_raw:
 
 rule fastp_trim:
     input:
-        "data/raw/{sample}.fastq.gz"
+        "data/raw/{sample}_interleaved.fastq.gz"
     output:
-        "data/trimmed/{sample}.trimmed.fastq", 
+        out1 = "data/trimmed/{sample}.F.trimmed.fastq",
+        out2 = "data/trimmed/{sample}.R.trimmed.fastq" 
     params:
         json = "reports/fastqc_trimmed/{sample}.json", 
         html = "reports/fastqc_trimmed/{sample}.html"
@@ -46,7 +50,7 @@ rule fastp_trim:
         "logs/fastp/{sample}.log"
     shell:
         "fastp --interleaved_in -j {params.json} -h {params.html} "
-        "-i {input} --stdout > {output} 2> {log}"
+        "-i {input} --out1 {output.out1} --out2 {output.out2} 2> {log}"
 
 rule fastqc_trimmed:
     input:
@@ -70,3 +74,35 @@ rule hisat2_index:
     threads: 12
     shell:
         "hisat2-build -p {threads} {input} {params.accession}"
+
+rule hisat2_align:
+    input:
+        in1 = "data/trimmed/{sample}.F.trimmed.fastq",
+        in2 = "data/trimmed/{sample}.R.trimmed.fastq" 
+    output:
+        "alignment/{sample}.sam"
+    params:
+        accession = REF_ACCESSION
+    log:
+        "logs/hisat2/{sample}.log"
+    threads: 8
+    shell:
+        "hisat2 -x {params.accession} -p {threads} "
+        "-1 {input.in1} -2 {input.in2} | samblaster > {output} 2> {log}"
+
+rule mark_dups:
+    input:
+        "alignment/{sample}.sam"
+    output:
+
+
+rule samtools_stats:
+    input:
+        "alignment/{sample}.sam"
+    output:
+        "samtools_stats/{sample}.txt"
+    log:
+        "logs/samtools_stats/{sample}.log"
+    threads: 8
+    shell:
+        "samtools stats {input} --threads {threads} > {output} 2> {log}"
