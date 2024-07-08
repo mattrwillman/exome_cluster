@@ -17,6 +17,7 @@ SAMPLES = wildcards.sample
 REF_ACCESSION = config['REF_ACCESSION']
 REF_FASTA = config['REF_FASTA']
 REF_DICT = os.path.splitext(REF_FASTA)[0] + '.dict'
+PICARD_JAR = config['PICARD_JAR']
 
 rule all:
     input:
@@ -27,7 +28,7 @@ rule all:
         expand("{accession}.{int}.ht21", accession = REF_ACCESSION, int = "1"), 
         expand("alignment/{sample}.sam", sample = SAMPLES), 
         expand("samtools_stats/{sample}.txt", sample = SAMPLES), 
-        expand("gatk/{sample}_g.vcf.gz", sample = SAMPLES), 
+        expand("gatk/{sample}.g.vcf.gz", sample = SAMPLES), 
         REF_DICT
 
 rule fastqc_raw:
@@ -92,7 +93,7 @@ rule hisat2_align:
         "logs/hisat2/{sample}.log"
     threads: 8
     shell:
-        "hisat2 -x {params.accession} -p {threads} "
+        "hisat2 -x {params.accession} -p {threads} --rg-id {wildcards.sample} "
         "-1 {input.in1} -2 {input.in2} | samblaster > {output} 2> {log}"
 
 rule mark_dups:
@@ -116,19 +117,28 @@ rule create_sequence_dictionary:
         ref = REF_FASTA
     output:
         dict = REF_DICT
+    params:
+        picard = PICARD_JAR
     shell:
-        "picard CreateSequenceDictionary R={input} O={output}"
+        "java -Xms5g -jar {params.picard} CreateSequenceDictionary -R {input} -O {output}"
 
 rule haplotypecaller:
     input:
         ref = REF_FASTA, 
         sam = "alignment/{sample}.sam"
     output:
-        "calls/{sample}_g.vcf.gz"
+        "calls/{sample}.g.vcf.gz"
+    log:
+        "logs/haplotypecaller/{sample}.log"
     shell:
         """
             gatk --java-options "-Xmx10g" HaplotypeCaller \
-            -R {input.ref} -I {input.sam} -O {output} -ERC GVCF
+            -R {input.ref} \
+            -I {input.sam} \
+            -O {output} \
+            -ERC GVCF \
+            --sample-name {wildcards.sample} \
+            2> {log}
         """
 
 rule makedatabase:
@@ -140,8 +150,8 @@ rule makedatabase:
         "logs/gatk/genomicsdbimport.log"
     shell:
         """
-            gatk --java-options "-Xmx16g -Xms4g" GenomicsDBImport \
-            {input.gvcf} --genomicsdb-workspace-path {output.db}
+            gatk --java-options "-Xmx16g -Xms4g" GenomicsDBImport {input.gvcf} \
+            --genomicsdb-workspace-path {output.db} 2> {log}
         """
 
 
