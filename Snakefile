@@ -2,8 +2,8 @@
 
 import os
 
-wildcards = glob_wildcards("data/raw/{sample}_interleaved.fastq.gz")
-SAMPLES = wildcards.sample
+#wildcards = glob_wildcards("data/raw/{sample}_interleaved.fastq.gz")
+#SAMPLES = wildcards.sample
 
 #SAMPLES = [
 #    "AGS2000-RALEIGH-SRWW_S1_L001", 
@@ -13,6 +13,8 @@ SAMPLES = wildcards.sample
 #    "HILLIARD_S27_L001", 
 #    "HILLIARD_S27_L002"
 #]
+
+SAMPLES = "AGS2000-RALEIGH-SRWW_S1_L001"
 
 REF_ACCESSION = config['REF_ACCESSION']
 REF_FASTA = config['REF_FASTA']
@@ -86,24 +88,34 @@ rule hisat2_align:
         in1 = "data/trimmed/{sample}.F.trimmed.fastq",
         in2 = "data/trimmed/{sample}.R.trimmed.fastq" 
     output:
-        "alignment/{sample}.sam"
+        sam = "alignment/{sample}.sam", 
+        bam = "alignment/{sample}.bam", 
+        sorted_bam = "alignment/{sample}.sorted.bam"
     params:
         accession = REF_ACCESSION
     log:
         "logs/hisat2/{sample}.log"
     threads: 8
     shell:
-        "hisat2 -x {params.accession} -p {threads} --rg-id {wildcards.sample} "
-        "-1 {input.in1} -2 {input.in2} | samblaster > {output} 2> {log}"
+        "hisat2 -x {params.accession} -p {threads} --rg-id {wildcards.sample} --rg SM:{wildcards.sample} "
+        "-1 {input.in1} -2 {input.in2} > {output.sam} 2> {log} ; "
+        "samtools view -Sb {output.sam} > {output.bam} ; "
+        "samtools sort {output.bam} -o {output.sorted_bam} ; "
+        "samtools index {output.sorted_bam}"
 
 rule mark_dups:
     input:
-        "alignment/{sample}.sam"
+        "alignment/{sample}.sorted.bam"
     output:
+        "alignment/{sample}.dedup.bam"
+    log:
+        "logs/markdups/{sample}.log"
+    shell:
+        "picard MarkDuplicates -I {input} -O {output} -M {log}"
 
 rule samtools_stats:
     input:
-        "alignment/{sample}.sam"
+        "alignment/{sample}.dedup.bam"
     output:
         "samtools_stats/{sample}.txt"
     log:
@@ -125,7 +137,7 @@ rule create_sequence_dictionary:
 rule haplotypecaller:
     input:
         ref = REF_FASTA, 
-        sam = "alignment/{sample}.sam"
+        sam = "alignment/{sample}.dedup.bam"
     output:
         "calls/{sample}.g.vcf.gz"
     log:
@@ -137,7 +149,6 @@ rule haplotypecaller:
             -I {input.sam} \
             -O {output} \
             -ERC GVCF \
-            --sample-name {wildcards.sample} \
             2> {log}
         """
 
