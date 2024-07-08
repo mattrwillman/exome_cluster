@@ -1,5 +1,7 @@
 #/project/gbru_wheat2/fhb/conda/exomecluster_env
 
+import os
+
 wildcards = glob_wildcards("data/raw/{sample}_interleaved.fastq.gz")
 SAMPLES = wildcards.sample
 
@@ -14,6 +16,7 @@ SAMPLES = wildcards.sample
 
 REF_ACCESSION = config['REF_ACCESSION']
 REF_FASTA = config['REF_FASTA']
+REF_DICT = os.path.splitext(REF_FASTA)[0] + '.dict'
 
 rule all:
     input:
@@ -23,7 +26,8 @@ rule all:
         expand("fastqc_out/trimmed/{sample}_interleaved.trimmed_fastqc.html", sample = SAMPLES), 
         expand("{accession}.{int}.ht21", accession = REF_ACCESSION, int = "1"), 
         expand("alignment/{sample}.sam", sample = SAMPLES), 
-        expand("samtools_stats/{sample}.txt", sample = SAMPLES)
+        expand("samtools_stats/{sample}.txt", sample = SAMPLES), 
+        expand("gatk/{sample}_g.vcf.gz", sample = SAMPLES)
 
 rule fastqc_raw:
     input:
@@ -95,7 +99,6 @@ rule mark_dups:
         "alignment/{sample}.sam"
     output:
 
-
 rule samtools_stats:
     input:
         "alignment/{sample}.sam"
@@ -106,3 +109,43 @@ rule samtools_stats:
     threads: 8
     shell:
         "samtools stats {input} --threads {threads} > {output} 2> {log}"
+
+rule create_sequence_dictionary:
+    input:
+        ref = REF_FASTA
+    output:
+        dict = REF_DICT
+    shell:
+        "picard CreateSequenceDictionary R={input} O={output}"
+
+rule haplotypecaller:
+    input:
+        ref = REF_FASTA, 
+        sam = "alignment/{sample}.sam"
+    output:
+        "calls/{sample}_g.vcf.gz"
+    shell:
+        """
+            gatk --java-options "-Xmx10g" HaplotypeCaller \
+            -R {input.ref} -I {input.sam} -O {output} -ERC GVCF
+        """
+
+rule makedatabase:
+    input:
+        gvcf = list(map("--variant {}".format, expand("calls/{sample}_g.vcf.gz", sample = SAMPLES)))
+    output:
+        db = directory("db")
+    log:
+        "logs/gatk/genomicsdbimport.log"
+    shell:
+        """
+            gatk --java-options "-Xmx16g -Xms4g" GenomicsDBImport \
+            {input.gvcf} --genomicsdb-workspace-path {output.db}
+        """
+
+
+gatk --java-options "-Xmx16g -Xms4g" GenomicsDBImport \
+    $cmd \
+    --genomicsdb-workspace-path $gvcfs/INTERVAL_${SLURM_ARRAY_TASK_ID}_db \
+    --reader-threads 2 \
+    --intervals $interval

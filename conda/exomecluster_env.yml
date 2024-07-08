@@ -10,3 +10,4 @@ dependencies:
   - hisat2
   - samtools
   - samblaster
+  - picard
