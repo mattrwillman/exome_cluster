@@ -27,7 +27,8 @@ rule all:
         expand("{accession}.{int}.ht21", accession = REF_ACCESSION, int = "1"), 
         expand("alignment/{sample}.sam", sample = SAMPLES), 
         expand("samtools_stats/{sample}.txt", sample = SAMPLES), 
-        expand("gatk/{sample}_g.vcf.gz", sample = SAMPLES)
+        expand("gatk/{sample}_g.vcf.gz", sample = SAMPLES), 
+        REF_DICT
 
 rule fastqc_raw:
     input:
