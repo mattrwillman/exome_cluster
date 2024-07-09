@@ -5,16 +5,16 @@ import os
 #wildcards = glob_wildcards("data/raw/{sample}_interleaved.fastq.gz")
 #SAMPLES = wildcards.sample
 
-#SAMPLES = [
-#    "AGS2000-RALEIGH-SRWW_S1_L001", 
-#    "AGS2000-RALEIGH-SRWW_S9_L002", 
-#    "AGS2000_S1_L001", 
-#    "AGS2000_S9_L002", 
-#    "HILLIARD_S27_L001", 
-#    "HILLIARD_S27_L002"
-#]
+SAMPLES = [
+    "AGS2000-RALEIGH-SRWW_S1_L001", 
+    "AGS2000-RALEIGH-SRWW_S9_L002", 
+    "AGS2000_S1_L001", 
+    "AGS2000_S9_L002", 
+    "HILLIARD_S27_L001", 
+    "HILLIARD_S27_L002"
+]
 
-SAMPLES = "AGS2000-RALEIGH-SRWW_S1_L001"
+#SAMPLES = "AGS2000-RALEIGH-SRWW_S1_L001"
 
 REF_ACCESSION = config['REF_ACCESSION']
 REF_FASTA = config['REF_FASTA']
@@ -30,7 +30,7 @@ rule all:
         expand("{accession}.{int}.ht21", accession = REF_ACCESSION, int = "1"), 
         expand("alignment/{sample}.sam", sample = SAMPLES), 
         expand("samtools_stats/{sample}.txt", sample = SAMPLES), 
-        expand("gatk/{sample}.g.vcf.gz", sample = SAMPLES), 
+        expand("calls/{sample}.g.vcf.gz", sample = SAMPLES), 
         REF_DICT
 
 rule fastqc_raw:
@@ -99,19 +99,30 @@ rule hisat2_align:
     shell:
         "hisat2 -x {params.accession} -p {threads} --rg-id {wildcards.sample} --rg SM:{wildcards.sample} "
         "-1 {input.in1} -2 {input.in2} > {output.sam} 2> {log} ; "
-        "samtools view -Sb {output.sam} > {output.bam} ; "
-        "samtools sort {output.bam} -o {output.sorted_bam} ; "
-        "samtools index {output.sorted_bam}"
+        "samtools view -Sb {output.sam} > {output.bam} 2>> {log} ; "
+        "samtools sort {output.bam} -o {output.sorted_bam} 2>> {log} ; "
+        "samtools index -c {output.sorted_bam} 2>> {log}"
 
 rule mark_dups:
     input:
         "alignment/{sample}.sorted.bam"
     output:
-        "alignment/{sample}.dedup.bam"
+        bam = "alignment/{sample}.dedup.bam", 
+        metrics = "logs/markdups/{sample}_metrics.txt"
     log:
         "logs/markdups/{sample}.log"
     shell:
-        "picard MarkDuplicates -I {input} -O {output} -M {log}"
+        "gatk MarkDuplicates -I {input} -O {output.bam} -M {output.metrics} 2> {log} ; "
+        "samtools index -c {output.bam} 2>> {log}"
+
+
+$in=$out ;
+$out=~s/bam$/sorted\.bam/;
+`gatk SortSam -I $in -O $out -SO coordinate ` ;
+
+#Create dictionary for reference  only needs to be done one time ;
+#`gatk CreateSequenceDictionary -R $ref  ` ;
+#`samtools faidx $ref  ` ;
 
 rule samtools_stats:
     input:
@@ -137,16 +148,18 @@ rule create_sequence_dictionary:
 rule haplotypecaller:
     input:
         ref = REF_FASTA, 
-        sam = "alignment/{sample}.dedup.bam"
+        dict = REF_DICT, 
+        bam = "alignment/{sample}.dedup.bam"
     output:
-        "calls/{sample}.g.vcf.gz"
+        "calls/{sample}.g.vcf"
     log:
         "logs/haplotypecaller/{sample}.log"
+    threads: 4
     shell:
         """
-            gatk --java-options "-Xmx10g" HaplotypeCaller \
+            gatk --java-options "-Xmx32g" HaplotypeCaller \
             -R {input.ref} \
-            -I {input.sam} \
+            -I {input.bam} \
             -O {output} \
             -ERC GVCF \
             2> {log}
@@ -154,7 +167,7 @@ rule haplotypecaller:
 
 rule makedatabase:
     input:
-        gvcf = list(map("--variant {}".format, expand("calls/{sample}_g.vcf.gz", sample = SAMPLES)))
+        gvcf = list(map("--variant {}".format, expand("calls/{sample}_g.vcf", sample = SAMPLES)))
     output:
         db = directory("db")
     log:

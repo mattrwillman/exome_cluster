@@ -1,0 +1,23 @@
+#Quality Control
+fastqc sample_R1.fastq sample_R2.fastq
+trimmomatic PE sample_R1.fastq sample_R2.fastq sample_R1_paired.fastq sample_R1_unpaired.fastq sample_R2_paired.fastq sample_R2_unpaired.fastq ILLUMINACLIP:TruSeq3-PE-2.fa:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36
+
+#Alignment
+bwa mem -R "@RG\tID:sample\tSM:sample\tPL:ILLUMINA" reference.fa sample_R1_paired.fastq sample_R2_paired.fastq > sample_aligned.sam
+samtools view -Sb sample_aligned.sam > sample_aligned.bam
+samtools sort sample_aligned.bam -o sample_sorted.bam
+samtools index sample_sorted.bam
+
+#Post-alignment processing
+gatk MarkDuplicates -I sample_sorted.bam -O sample_dedup.bam -M sample_metrics.txt
+gatk BaseRecalibrator -I sample_dedup.bam -R reference.fa --known-sites known_sites.vcf -O recal_data.table
+gatk ApplyBQSR -I sample_dedup.bam -R reference.fa --bqsr-recal-file recal_data.table -O sample_recal.bam
+
+#Variant calling
+gatk HaplotypeCaller -R reference.fa -I sample_recal.bam -O raw_variants.vcf
+
+#Variant filtering
+gatk VariantFiltration -R reference.fa -V raw_variants.vcf -O filtered_variants.vcf --filter-expression "QD < 2.0 || FS > 60.0 || MQ < 40.0" --filter-name "basic_snp_filter"
+
+#Annotation
+table_annovar.pl filtered_variants.vcf humandb/ -buildver hg38 -out annotated_variants -remove -protocol refGene,cytoBand,exac03,gnomad211_exome -operation g,r,f,f -nastring . -vcfinput
