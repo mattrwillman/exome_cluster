@@ -101,7 +101,7 @@ rule hisat2_align:
     shell:
         "hisat2 -x {params.accession} -p {threads} --rg-id {wildcards.sample} --rg SM:{wildcards.sample} "
         "-1 {input.in1} -2 {input.in2} > {output.sam} 2> {log} ; "
-        "samtools view -Sb {output.sam} > {output.bam} 2>> {log} ; "
+        "samtools view -Sb  -F 256 {output.sam} > {output.bam} 2>> {log} ; " #-F 256 removes non-primary alignments
         "samtools sort {output.bam} -o {output.sorted_bam} 2>> {log} ; "
         "samtools index -c {output.sorted_bam} 2>> {log}"
 
