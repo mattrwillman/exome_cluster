@@ -179,7 +179,7 @@ rule makedatabase:
 rule genotype:
     input:
         ref = REF_FASTA, 
-        db = "gendb://db"
+        db = "db"
     output:
         "srww_exome.vcf"
     threads: 48
@@ -187,6 +187,6 @@ rule genotype:
         """
             gatk --java-option "-Xmx300g -Xms100g" GenotypeGVCFs \
             -R {input.ref} \
-            -V {input.db} \
+            -V gendb://{input.db} \
             -O {output}
         """
