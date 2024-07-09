@@ -31,7 +31,9 @@ rule all:
         expand("alignment/{sample}.sam", sample = SAMPLES), 
         expand("samtools_stats/{sample}.txt", sample = SAMPLES), 
         expand("calls/{sample}.g.vcf.gz", sample = SAMPLES), 
-        REF_DICT
+        REF_DICT, 
+        "db",
+        "srww_exome.vcf"
 
 rule fastqc_raw:
     input:
@@ -115,15 +117,6 @@ rule mark_dups:
         "gatk MarkDuplicates -I {input} -O {output.bam} -M {output.metrics} 2> {log} ; "
         "samtools index -c {output.bam} 2>> {log}"
 
-
-$in=$out ;
-$out=~s/bam$/sorted\.bam/;
-`gatk SortSam -I $in -O $out -SO coordinate ` ;
-
-#Create dictionary for reference  only needs to be done one time ;
-#`gatk CreateSequenceDictionary -R $ref  ` ;
-#`samtools faidx $ref  ` ;
-
 rule samtools_stats:
     input:
         "alignment/{sample}.dedup.bam"
@@ -167,20 +160,33 @@ rule haplotypecaller:
 
 rule makedatabase:
     input:
-        gvcf = list(map("--variant {}".format, expand("calls/{sample}_g.vcf", sample = SAMPLES)))
+        gvcf = expand("calls/{sample}.g.vcf", sample = SAMPLES), 
+        intervals = "files/intervals.list", 
+#        gvcf = list(map("--variant {}".format, expand("calls/{sample}.g.vcf", sample = SAMPLES)))
     output:
-        db = directory("db")
+        db = directory("db"), 
+        store = "db/something"
     log:
         "logs/gatk/genomicsdbimport.log"
+    threads: 48
+    run:
+        flagged_gvcf = ["--variant " + f for f in input.gvcf]
+        shell("""
+            gatk --java-options "-Xmx300g -Xms100g" GenomicsDBImport {flagged_gvcf} \
+            --genomicsdb-workspace-path {output.db} -L {input.intervals} 2> {log}
+        """)
+
+rule genotype:
+    input:
+        ref = REF_FASTA, 
+        db = "gendb://db"
+    output:
+        "srww_exome.vcf"
+    threads: 48
     shell:
         """
-            gatk --java-options "-Xmx16g -Xms4g" GenomicsDBImport {input.gvcf} \
-            --genomicsdb-workspace-path {output.db} 2> {log}
+            gatk --java-option "-Xmx300g -Xms100g" GenotypeGVCFs \
+            -R {input.ref} \
+            -V {input.db} \
+            -O {output}
         """
-
-
-gatk --java-options "-Xmx16g -Xms4g" GenomicsDBImport \
-    $cmd \
-    --genomicsdb-workspace-path $gvcfs/INTERVAL_${SLURM_ARRAY_TASK_ID}_db \
-    --reader-threads 2 \
-    --intervals $interval
