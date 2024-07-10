@@ -161,8 +161,7 @@ rule haplotypecaller:
 rule makedatabase:
     input:
         gvcf = expand("calls/{sample}.g.vcf", sample = SAMPLES), 
-        intervals = "files/intervals.list", 
-#        gvcf = list(map("--variant {}".format, expand("calls/{sample}.g.vcf", sample = SAMPLES)))
+        intervals = "files/intervals.list"
     output:
         db = directory("db"), 
         store = "db/something"
