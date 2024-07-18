@@ -17,4 +17,6 @@ module load miniconda3
 
 source activate /project/gbru_wheat2/fhb/conda/exomecluster_env
 
+module load apptainer
+
 snakemake --cores 'all' --configfile config.yml

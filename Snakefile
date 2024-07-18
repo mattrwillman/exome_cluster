@@ -5,8 +5,6 @@ import os
 #wildcards = glob_wildcards("data/raw/{sample}_interleaved.fastq.gz")
 #SAMPLES = wildcards.sample
 
-GATK_SIF = "/project/gbru_wheat2/fhb/singularity/gatk_latest.sif"
-
 SAMPLES = [
     "AGS2000-RALEIGH-SRWW_S1_L001", 
     "AGS2000-RALEIGH-SRWW_S9_L002", 
@@ -22,6 +20,7 @@ REF_ACCESSION = config['REF_ACCESSION']
 REF_FASTA = config['REF_FASTA']
 REF_DICT = os.path.splitext(REF_FASTA)[0] + '.dict'
 PICARD_JAR = config['PICARD_JAR']
+GATK_SIF = config['GATK_SIF']
 
 rule all:
     input:
@@ -150,11 +149,11 @@ rule haplotypecaller:
     log:
         "logs/haplotypecaller/{sample}.log"
     params:
-        run_gatk = expand("apptainer exec {sif}", sif = GATK_SIF)
+        gatk_sif = GATK_SIF
     threads: 4
     shell:
         """
-            {params.run_gatk} --java-options "-Xmx32g" HaplotypeCaller \
+            apptainer exec {params.gatk_sif} gatk --java-options "-Xmx32g" HaplotypeCaller \
             -R {input.ref} \
             -I {input.bam} \
             -O {output} \
