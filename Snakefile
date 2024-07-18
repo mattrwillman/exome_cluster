@@ -5,6 +5,8 @@ import os
 #wildcards = glob_wildcards("data/raw/{sample}_interleaved.fastq.gz")
 #SAMPLES = wildcards.sample
 
+GATK_SIF = "/project/gbru_wheat2/fhb/singularity/gatk_latest.sif"
+
 SAMPLES = [
     "AGS2000-RALEIGH-SRWW_S1_L001", 
     "AGS2000-RALEIGH-SRWW_S9_L002", 
@@ -147,10 +149,12 @@ rule haplotypecaller:
         "calls/{sample}.g.vcf"
     log:
         "logs/haplotypecaller/{sample}.log"
+    params:
+        run_gatk = expand("apptainer exec {sif}", sif = GATK_SIF)
     threads: 4
     shell:
         """
-            gatk --java-options "-Xmx32g" HaplotypeCaller \
+            {params.run_gatk} --java-options "-Xmx32g" HaplotypeCaller \
             -R {input.ref} \
             -I {input.bam} \
             -O {output} \
@@ -167,11 +171,13 @@ rule makedatabase:
         store = "db/something"
     log:
         "logs/gatk/genomicsdbimport.log"
+    params:
+        run_gatk = expand("apptainer exec {sif}", sif = GATK_SIF)
     threads: 48
     run:
         flagged_gvcf = ["--variant " + f for f in input.gvcf]
         shell("""
-            gatk --java-options "-Xmx300g -Xms100g" GenomicsDBImport {flagged_gvcf} \
+            {params.run_gatk} --java-options "-Xmx300g -Xms100g" GenomicsDBImport {flagged_gvcf} \
             --genomicsdb-workspace-path {output.db} -L {input.intervals} 2> {log}
         """)
 
@@ -181,10 +187,12 @@ rule genotype:
         db = "db"
     output:
         "srww_exome.vcf"
+    params:
+        run_gatk = expand("apptainer exec {sif}", sif = GATK_SIF)
     threads: 48
     shell:
         """
-            gatk --java-option "-Xmx300g -Xms100g" GenotypeGVCFs \
+            {params.run_gatk} --java-option "-Xmx300g -Xms100g" GenotypeGVCFs \
             -R {input.ref} \
             -V gendb://{input.db} \
             -O {output}
