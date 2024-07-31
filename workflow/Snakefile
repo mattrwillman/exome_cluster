@@ -1,20 +1,7 @@
-#/project/gbru_wheat2/fhb/conda/exomecluster_env
-
 import os
 
-#wildcards = glob_wildcards("data/raw/{sample}_interleaved.fastq.gz")
-#SAMPLES = wildcards.sample
-
-SAMPLES = [
-    "AGS2000-RALEIGH-SRWW_S1_L001", 
-    "AGS2000-RALEIGH-SRWW_S9_L002", 
-    "AGS2000_S1_L001", 
-    "AGS2000_S9_L002", 
-    "HILLIARD_S27_L001", 
-    "HILLIARD_S27_L002"
-]
-
-#SAMPLES = "AGS2000-RALEIGH-SRWW_S1_L001"
+wildcards = glob_wildcards(config['FASTQ_DIR'] + "{sample}_interleaved.fastq.gz")
+SAMPLES = wildcards.sample
 
 REF_ACCESSION = config['REF_ACCESSION']
 REF_FASTA = config['REF_FASTA']
@@ -25,15 +12,8 @@ GATK_SIF = config['GATK_SIF']
 rule all:
     input:
         expand("fastqc_out/raw/{sample}_interleaved_fastqc.html", sample = SAMPLES), 
-        expand("data/trimmed/{sample}.F.trimmed.fastq", sample = SAMPLES), 
-        expand("data/trimmed/{sample}.R.trimmed.fastq", sample = SAMPLES), 
-        expand("fastqc_out/trimmed/{sample}_interleaved.trimmed_fastqc.html", sample = SAMPLES), 
-        expand("{accession}.{int}.ht21", accession = REF_ACCESSION, int = "1"), 
-        expand("alignment/{sample}.sam", sample = SAMPLES), 
+        expand("fastqc_out/trimmed/{sample}.{r}.trimmed_fastqc.html", sample = SAMPLES, r = ["F", "R"]), 
         expand("samtools_stats/{sample}.txt", sample = SAMPLES), 
-        expand("calls/{sample}.g.vcf.gz", sample = SAMPLES), 
-        REF_DICT, 
-        "db",
         "srww_exome.vcf"
 
 rule fastqc_raw:
@@ -54,14 +34,11 @@ rule fastp_trim:
     output:
         out1 = "data/trimmed/{sample}.F.trimmed.fastq",
         out2 = "data/trimmed/{sample}.R.trimmed.fastq" 
-    params:
-        json = "reports/fastqc_trimmed/{sample}.json", 
-        html = "reports/fastqc_trimmed/{sample}.html"
     log:
         "logs/fastp/{sample}.log"
     shell:
-        "fastp --interleaved_in -j {params.json} -h {params.html} "
-        "-i {input} --out1 {output.out1} --out2 {output.out2} 2> {log}"
+        "fastp --interleaved_in -i {input} "
+        "--out1 {output.out1} --out2 {output.out2} 2> {log}"
 
 rule fastqc_trimmed:
     input:

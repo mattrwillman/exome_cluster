@@ -1,11 +1,11 @@
 #!/bin/bash
 
-#SBATCH --job-name="exome_cluster"            #name of the job submitted
+#SBATCH --job-name="exome_cluster_Hilliard"            #name of the job submitted
 #SBATCH -p atlas                      #name of the queue you are submitting job to
 #SBATCH -A gbru_wheat2
 #SBATCH -N 1                            #number of nodes in this job
-#SBATCH -n 12                           #number of cores/tasks in this job
-#SBATCH -t 2-00:00:00                                   #time allocated for this job hours:mins:seconds
+#SBATCH -n 48                           #number of cores/tasks in this job
+#SBATCH -t 14-00:00:00                                   #time allocated for this job hours:mins:seconds
 #SBATCH --mail-user=mrwillma@ncsu.edu   #email address
 #SBATCH --mail-type=BEGIN
 #SBATCH --mail-type=END
@@ -19,4 +19,4 @@ source activate /project/gbru_wheat2/fhb/conda/exomecluster_env
 
 module load apptainer
 
-snakemake --cores 'all' --configfile config.yml
+snakemake --cores 'all' --configfile config/config.yml

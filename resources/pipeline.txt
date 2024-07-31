@@ -1,3 +1,5 @@
+## Sample GATK workflow
+
 #Quality Control
 fastqc sample_R1.fastq sample_R2.fastq
 trimmomatic PE sample_R1.fastq sample_R2.fastq sample_R1_paired.fastq sample_R1_unpaired.fastq sample_R2_paired.fastq sample_R2_unpaired.fastq ILLUMINACLIP:TruSeq3-PE-2.fa:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36
