@@ -1,5 +1,5 @@
-REF_ACCESSION: "Hilliard"
-REF_FASTA: "/project/gbru_wheat2/ref/Daniela/Triticum_aestivum_Hilliard.fasta"
+REF_GENOTYPE: "Hilliard"
+REF_FASTA: "/90daydata/gbru_wheat2/Snakemake_linted/Hilliard/1_Assembly/Hilliard_scaffold_assembly.fa"
 FASTQ_DIR: "/90daydata/gbru_wheat2/Exomecluster/data/raw"
 PICARD_JAR: "/project/gbru_wheat2/fhb/conda/exomecluster_env/share/picard-3.2.0-0/picard.jar"
 GATK_SIF: "/project/gbru_wheat2/fhb/singularity/gatk_latest.sif"

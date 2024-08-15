@@ -1,28 +1,29 @@
 import os
 
-wildcards = glob_wildcards(config['FASTQ_DIR'] + "{sample}_interleaved.fastq.gz")
+wildcards = glob_wildcards(config['FASTQ_DIR'] + "/{sample}_interleaved.fastq.gz")
 SAMPLES = wildcards.sample
 
-REF_ACCESSION = config['REF_ACCESSION']
+REF_GENOTYPE = config['REF_GENOTYPE']
 REF_FASTA = config['REF_FASTA']
-REF_DICT = os.path.splitext(REF_FASTA)[0] + '.dict'
+#REF_DICT = os.path.splitext(REF_FASTA)[0] + '.dict'
+FASTQ_DIR = config['FASTQ_DIR']
 PICARD_JAR = config['PICARD_JAR']
 GATK_SIF = config['GATK_SIF']
 
 rule all:
     input:
-        expand("fastqc_out/raw/{sample}_interleaved_fastqc.html", sample = SAMPLES), 
-        expand("fastqc_out/trimmed/{sample}.{r}.trimmed_fastqc.html", sample = SAMPLES, r = ["F", "R"]), 
-        expand("samtools_stats/{sample}.txt", sample = SAMPLES), 
-        "srww_exome.vcf"
+        expand("results/fastqc_out/raw/{sample}_interleaved_fastqc.html", sample = SAMPLES), 
+        expand("results/fastqc_out/trimmed/{sample}.{r}.trimmed_fastqc.html", sample = SAMPLES, r = ["F", "R"]), 
+        expand("results/samtools_stats/{sample}.txt", sample = SAMPLES), 
+        "results/srww_exome.vcf"
 
 rule fastqc_raw:
     input:
-        "data/raw/{sample}.fastq.gz"
+        expand("{dir}/{{sample}}_interleaved.fastq.gz", dir = FASTQ_DIR)
     output:
-        "fastqc_out/raw/{sample}_fastqc.html"
+        "results/fastqc_out/raw/{sample}_interleaved_fastqc.html"
     params:
-        outdir = "fastqc_out/raw"
+        outdir = "results/fastqc_out/raw"
     log:
         "logs/fastqc_raw/{sample}.log"
     shell:
@@ -30,10 +31,10 @@ rule fastqc_raw:
 
 rule fastp_trim:
     input:
-        "data/raw/{sample}_interleaved.fastq.gz"
+        expand("{dir}/{{sample}}_interleaved.fastq.gz", dir = FASTQ_DIR)
     output:
-        out1 = "data/trimmed/{sample}.F.trimmed.fastq",
-        out2 = "data/trimmed/{sample}.R.trimmed.fastq" 
+        out1 = "results/data/trimmed/{sample}.F.trimmed.fastq",
+        out2 = "results/data/trimmed/{sample}.R.trimmed.fastq" 
     log:
         "logs/fastp/{sample}.log"
     shell:
@@ -42,11 +43,11 @@ rule fastp_trim:
 
 rule fastqc_trimmed:
     input:
-        "data/trimmed/{sample}.fastq"
+        "results/data/trimmed/{sample}.fastq"
     output:
-        "fastqc_out/trimmed/{sample}_fastqc.html"
+        "results/fastqc_out/trimmed/{sample}_fastqc.html"
     params:
-        outdir = "fastqc_out/trimmed"
+        outdir = "results/fastqc_out/trimmed"
     log:
         "logs/fastqc_trimmed/{sample}.log"
     shell:
@@ -56,28 +57,30 @@ rule hisat2_index:
     input:
         fasta = REF_FASTA
     output:
-        "{accession}.{int}.ht21"
+        expand("resources/idx/{ref}.{int}.ht21", ref = REF_GENOTYPE, int = 1)
     params:
-        accession = REF_ACCESSION
+        ref = expand("resources/idx/{ref}", ref = REF_GENOTYPE)
+    log:
+        "logs/hisat2idx.log"
     threads: 12
     shell:
-        "hisat2-build -p {threads} {input} {params.accession}"
+        "hisat2-build -p {threads} {input} {params.ref} &> {log}"
 
 rule hisat2_align:
     input:
-        in1 = "data/trimmed/{sample}.F.trimmed.fastq",
-        in2 = "data/trimmed/{sample}.R.trimmed.fastq" 
+        in1 = "results/data/trimmed/{sample}.F.trimmed.fastq",
+        in2 = "results/data/trimmed/{sample}.R.trimmed.fastq" 
     output:
-        sam = "alignment/{sample}.sam", 
-        bam = "alignment/{sample}.bam", 
-        sorted_bam = "alignment/{sample}.sorted.bam"
+        sam = "results/alignment/{sample}.sam", 
+        bam = "results/alignment/{sample}.bam", 
+        sorted_bam = "results/alignment/{sample}.sorted.bam"
     params:
-        accession = REF_ACCESSION
+        ref = expand("resources/idx/{ref}", ref = REF_GENOTYPE)
     log:
         "logs/hisat2/{sample}.log"
     threads: 8
     shell:
-        "hisat2 -x {params.accession} -p {threads} --rg-id {wildcards.sample} --rg SM:{wildcards.sample} "
+        "hisat2 -x {params.ref} -p {threads} --rg-id {wildcards.sample} --rg SM:{wildcards.sample} "
         "-1 {input.in1} -2 {input.in2} > {output.sam} 2> {log} ; "
         "samtools view -Sb  -F 256 {output.sam} > {output.bam} 2>> {log} ; " #-F 256 removes non-primary alignments
         "samtools sort {output.bam} -o {output.sorted_bam} 2>> {log} ; "
@@ -85,9 +88,9 @@ rule hisat2_align:
 
 rule mark_dups:
     input:
-        "alignment/{sample}.sorted.bam"
+        "results/alignment/{sample}.sorted.bam"
     output:
-        bam = "alignment/{sample}.dedup.bam", 
+        bam = "results/alignment/{sample}.dedup.bam", 
         metrics = "logs/markdups/{sample}_metrics.txt"
     log:
         "logs/markdups/{sample}.log"
@@ -97,9 +100,9 @@ rule mark_dups:
 
 rule samtools_stats:
     input:
-        "alignment/{sample}.dedup.bam"
+        "results/alignment/{sample}.dedup.bam"
     output:
-        "samtools_stats/{sample}.txt"
+        "results/samtools_stats/{sample}.txt"
     log:
         "logs/samtools_stats/{sample}.log"
     threads: 8
@@ -110,7 +113,7 @@ rule create_sequence_dictionary:
     input:
         ref = REF_FASTA
     output:
-        dict = REF_DICT
+        dict = expand("resources/idx/{ref}.dict", ref = REF_GENOTYPE)
     params:
         picard = PICARD_JAR
     shell:
@@ -119,10 +122,10 @@ rule create_sequence_dictionary:
 rule haplotypecaller:
     input:
         ref = REF_FASTA, 
-        dict = REF_DICT, 
-        bam = "alignment/{sample}.dedup.bam"
+        dict = expand("resources/idx/{ref}.dict", ref = REF_GENOTYPE), 
+        bam = "results/alignment/{sample}.dedup.bam"
     output:
-        "calls/{sample}.g.vcf"
+        "results/calls/{sample}.g.vcf"
     log:
         "logs/haplotypecaller/{sample}.log"
     params:
@@ -131,6 +134,7 @@ rule haplotypecaller:
     shell:
         """
             apptainer exec {params.gatk_sif} gatk --java-options "-Xmx32g" HaplotypeCaller \
+            --sequence-dictionary {input.dict} \
             -R {input.ref} \
             -I {input.bam} \
             -O {output} \
@@ -140,11 +144,10 @@ rule haplotypecaller:
 
 rule makedatabase:
     input:
-        gvcf = expand("calls/{sample}.g.vcf", sample = SAMPLES), 
-        intervals = "files/intervals.list"
+        gvcf = expand("results/calls/{sample}.g.vcf", sample = SAMPLES), 
+        intervals = "resources/files/intervals.list"
     output:
-        db = directory("db"), 
-        store = "db/something"
+        db = directory("results/db")
     log:
         "logs/gatk/genomicsdbimport.log"
     params:
@@ -160,16 +163,20 @@ rule makedatabase:
 rule genotype:
     input:
         ref = REF_FASTA, 
-        db = "db"
+        dict = expand("resources/idx/{ref}.dict", ref = REF_GENOTYPE), 
+        db = "results/db"
     output:
-        "srww_exome.vcf"
+        "results/srww_exome.vcf"
     params:
         run_gatk = expand("apptainer exec {sif}", sif = GATK_SIF)
+    log:
+        "logs/callgenotypes.log"
     threads: 48
     shell:
         """
             {params.run_gatk} --java-option "-Xmx300g -Xms100g" GenotypeGVCFs \
+            --sequence-dictionary {input.dict} \
             -R {input.ref} \
             -V gendb://{input.db} \
-            -O {output}
+            -O {output} 2> {log}
         """
