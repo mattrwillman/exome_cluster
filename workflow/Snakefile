@@ -57,7 +57,7 @@ rule hisat2_index:
     input:
         fasta = REF_FASTA
     output:
-        expand("resources/idx/{ref}.{int}.ht21", ref = REF_GENOTYPE, int = 1)
+        expand("resources/idx/{ref}.{int}.ht2l", ref = REF_GENOTYPE, int = 1)
     params:
         ref = expand("resources/idx/{ref}", ref = REF_GENOTYPE)
     log:
