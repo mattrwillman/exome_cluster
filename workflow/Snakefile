@@ -70,7 +70,7 @@ rule hisat2_align:
     input:
         in1 = "results/data/trimmed/{sample}.F.trimmed.fastq",
         in2 = "results/data/trimmed/{sample}.R.trimmed.fastq", 
-        idx = expand("resources/idx/{ref}.{int}.ht21", ref = REF_GENOTYPE, int = 1)
+        idx = expand("resources/idx/{ref}.{int}.ht2l", ref = REF_GENOTYPE, int = 1)
     output:
         sam = "results/alignment/{sample}.sam", 
         bam = "results/alignment/{sample}.bam", 
