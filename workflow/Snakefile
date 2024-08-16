@@ -6,6 +6,7 @@ SAMPLES = wildcards.sample
 REF_GENOTYPE = config['REF_GENOTYPE']
 REF_FASTA = config['REF_FASTA']
 #REF_DICT = os.path.splitext(REF_FASTA)[0] + '.dict'
+REF_FAI = os.path.splitext(REF_FASTA)[0] + '.fai'
 FASTQ_DIR = config['FASTQ_DIR']
 PICARD_JAR = config['PICARD_JAR']
 GATK_SIF = config['GATK_SIF']
@@ -119,6 +120,14 @@ rule create_sequence_dictionary:
         picard = PICARD_JAR
     shell:
         "java -Xms5g -jar {params.picard} CreateSequenceDictionary -R {input} -O {output}"
+
+rule create_fasta_index:
+    input:
+        ref = REF_FASTA
+    output:
+        fai = REF_FAI
+    shell:
+        "samtools faidx {input}"
 
 rule haplotypecaller:
     input:
