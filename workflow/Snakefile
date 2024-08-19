@@ -132,6 +132,7 @@ rule create_fasta_index:
 rule haplotypecaller:
     input:
         ref = REF_FASTA, 
+        fai = REF_FAI, 
         dict = expand("resources/idx/{ref}.dict", ref = REF_GENOTYPE), 
         bam = "results/alignment/{sample}.dedup.bam"
     output:
