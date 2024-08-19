@@ -5,8 +5,8 @@ SAMPLES = wildcards.sample
 
 REF_GENOTYPE = config['REF_GENOTYPE']
 REF_FASTA = config['REF_FASTA']
-#REF_DICT = os.path.splitext(REF_FASTA)[0] + '.dict'
-REF_FAI = os.path.splitext(REF_FASTA)[0] + '.fai'
+REF_DICT = os.path.splitext(REF_FASTA)[0] + '.dict'
+REF_FAI = REF_FASTA + '.fai'
 FASTQ_DIR = config['FASTQ_DIR']
 PICARD_JAR = config['PICARD_JAR']
 GATK_SIF = config['GATK_SIF']
