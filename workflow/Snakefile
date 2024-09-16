@@ -1,3 +1,8 @@
+#Apptainer is used to access GATK version 4.6
+#Highest GATK version available in conda build is currently 4.5
+#GATK version 4.5 stores missing marker calls as 0/0, which may be incorrectly interpreted by some downstream software as homozygous ref
+#GATK version 4.6 stores missing marker calls as -/-
+
 import os
 
 wildcards = glob_wildcards(config['FASTQ_DIR'] + "/{sample}_interleaved.fastq.gz")
@@ -113,9 +118,9 @@ rule samtools_stats:
 
 rule create_sequence_dictionary:
     input:
-        ref = REF_FASTA
+        REF_FASTA
     output:
-        dict = expand("resources/idx/{ref}.dict", ref = REF_GENOTYPE)
+        REF_DICT
     params:
         picard = PICARD_JAR
     shell:
@@ -133,7 +138,7 @@ rule haplotypecaller:
     input:
         ref = REF_FASTA, 
         fai = REF_FAI, 
-        dict = expand("resources/idx/{ref}.dict", ref = REF_GENOTYPE), 
+        dict = REF_DICT, 
         bam = "results/alignment/{sample}.dedup.bam"
     output:
         "results/calls/{sample}.g.vcf"
@@ -145,7 +150,6 @@ rule haplotypecaller:
     shell:
         """
             apptainer exec {params.gatk_sif} gatk --java-options "-Xmx32g" HaplotypeCaller \
-            --sequence-dictionary {input.dict} \
             -R {input.ref} \
             -I {input.bam} \
             -O {output} \
@@ -162,12 +166,12 @@ rule makedatabase:
     log:
         "logs/gatk/genomicsdbimport.log"
     params:
-        run_gatk = expand("apptainer exec {sif}", sif = GATK_SIF)
+        gatk_sif = GATK_SIF
     threads: 48
     run:
         flagged_gvcf = ["--variant " + f for f in input.gvcf]
         shell("""
-            {params.run_gatk} --java-options "-Xmx300g -Xms100g" GenomicsDBImport {flagged_gvcf} \
+            apptainer exec {params.gatk_sif} gatk --java-options "-Xmx300g -Xms100g" GenomicsDBImport {flagged_gvcf} \
             --genomicsdb-workspace-path {output.db} -L {input.intervals} 2> {log}
         """)
 
@@ -179,13 +183,13 @@ rule genotype:
     output:
         "results/srww_exome.vcf"
     params:
-        run_gatk = expand("apptainer exec {sif}", sif = GATK_SIF)
+        gatk_sif = GATK_SIF
     log:
         "logs/callgenotypes.log"
     threads: 48
     shell:
         """
-            {params.run_gatk} --java-option "-Xmx300g -Xms100g" GenotypeGVCFs \
+            apptainer exec {params.gatk_sif} gatk --java-options "-Xmx1536g -Xms1500g" GenotypeGVCFs \
             --sequence-dictionary {input.dict} \
             -R {input.ref} \
             -V gendb://{input.db} \
