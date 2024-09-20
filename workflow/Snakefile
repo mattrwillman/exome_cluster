@@ -21,7 +21,7 @@ rule all:
         expand("results/fastqc_out/raw/{sample}_interleaved_fastqc.html", sample = SAMPLES), 
         expand("results/fastqc_out/trimmed/{sample}.{r}.trimmed_fastqc.html", sample = SAMPLES, r = ["F", "R"]), 
         expand("results/samtools_stats/{sample}.txt", sample = SAMPLES), 
-        "results/srww_exome.vcf"
+        expand("results/srww_exome_{interval}.vcf", interval = config['INTERVALS'])
 
 rule fastqc_raw:
     input:
@@ -179,19 +179,21 @@ rule genotype:
     input:
         ref = REF_FASTA, 
         dict = expand("resources/idx/{ref}.dict", ref = REF_GENOTYPE), 
-        db = "results/db"
+        db = "results/db", 
+        intervals = "resources/files/intervals.list"
     output:
-        "results/srww_exome.vcf"
+        "results/srww_exome_{interval}.vcf"
     params:
         gatk_sif = GATK_SIF
     log:
-        "logs/callgenotypes.log"
-    threads: 48
+        "logs/callgenotypes_{interval}.log"
+    threads: 12
     shell:
         """
             apptainer exec {params.gatk_sif} gatk --java-options "-Xmx1536g -Xms1500g" GenotypeGVCFs \
             --sequence-dictionary {input.dict} \
             -R {input.ref} \
             -V gendb://{input.db} \
+            -L {input.intervals} \
             -O {output} 2> {log}
         """
