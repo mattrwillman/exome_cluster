@@ -179,8 +179,7 @@ rule genotype:
     input:
         ref = REF_FASTA, 
         dict = expand("resources/idx/{ref}.dict", ref = REF_GENOTYPE), 
-        db = "results/db", 
-        intervals = "resources/files/intervals.list"
+        db = "results/db"
     output:
         "results/srww_exome_{interval}.vcf"
     params:
@@ -194,6 +193,6 @@ rule genotype:
             --sequence-dictionary {input.dict} \
             -R {input.ref} \
             -V gendb://{input.db} \
-            -L {input.intervals} \
+            -L {wildcards.interval} \
             -O {output} 2> {log}
         """
