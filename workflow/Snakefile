@@ -186,7 +186,7 @@ rule genotype:
         gatk_sif = GATK_SIF
     log:
         "logs/callgenotypes_{interval}.log"
-    threads: 16
+    threads: 48
     shell:
         """
             apptainer exec {params.gatk_sif} gatk --java-options "-Xmx1536g -Xms1500g" GenotypeGVCFs \
