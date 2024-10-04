@@ -171,7 +171,7 @@ rule makedatabase:
     run:
         flagged_gvcf = ["--variant " + f for f in input.gvcf]
         shell("""
-            apptainer exec {params.gatk_sif} gatk --java-options "-Xmx300g -Xms100g" GenomicsDBImport {flagged_gvcf} \
+            apptainer exec {params.gatk_sif} gatk --java-options "-Xmx1536g -Xms1500g" GenomicsDBImport {flagged_gvcf} \
             --genomicsdb-workspace-path {output.db} -L {input.intervals} 2> {log}
         """)
 
@@ -196,3 +196,29 @@ rule genotype:
             -L {wildcards.interval} \
             -O {output} 2> {log}
         """
+rule merge_vcfs:
+    input:
+        expand("results/srww_exome_{interval}.vcf", interval = config['INTERVALS'])
+    output:
+        "results/srww_exome_allChr.vcf"
+    log:
+        "logs/merge_genotype_vcfs.log"
+    run:
+        vcfs = ["I=" + f for f in input + " "]
+        shell("""
+            java -Xms1500g -jar {params.picard} MergeVcfs \
+            {vcfs} \
+            O={output}
+            2> {log}
+        """)
+
+rule filter_merged_vcf:
+    input:
+        "results/srww_exome_allChr.vcf"
+    output:
+        "results/srww_exome_allChr.maf05.vcf"
+    log:
+        "logs/filter_merged_vcf.log"
+    shell:
+        "vcftools --vcf {input} --maf 0.05 --out {output} 2> {log}"
+
