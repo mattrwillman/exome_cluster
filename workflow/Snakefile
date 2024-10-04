@@ -21,7 +21,9 @@ rule all:
         expand("results/fastqc_out/raw/{sample}_interleaved_fastqc.html", sample = SAMPLES), 
         expand("results/fastqc_out/trimmed/{sample}.{r}.trimmed_fastqc.html", sample = SAMPLES, r = ["F", "R"]), 
         expand("results/samtools_stats/{sample}.txt", sample = SAMPLES), 
-        expand("results/srww_exome_{interval}.vcf", interval = config['INTERVALS'])
+        expand("results/srww_exome_{interval}.vcf", interval = config['INTERVALS']), 
+        "results/srww_exome_allChr.vcf", 
+        "results/srww_exome_allChr.maf05.vcf"
 
 rule fastqc_raw:
     input:
@@ -201,10 +203,12 @@ rule merge_vcfs:
         expand("results/srww_exome_{interval}.vcf", interval = config['INTERVALS'])
     output:
         "results/srww_exome_allChr.vcf"
+    params:
+        picard = PICARD_JAR
     log:
         "logs/merge_genotype_vcfs.log"
     run:
-        vcfs = ["I=" + f for f in input + " "]
+        vcfs = ["I=" + f for f in input]
         shell("""
             java -Xms1500g -jar {params.picard} MergeVcfs \
             {vcfs} \
