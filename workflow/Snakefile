@@ -212,7 +212,7 @@ rule merge_vcfs:
         shell("""
             java -Xms1500g -jar {params.picard} MergeVcfs \
             {vcfs} \
-            O={output}
+            O={output} \
             2> {log}
         """)
 
