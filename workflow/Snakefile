@@ -23,7 +23,7 @@ rule all:
         expand("results/samtools_stats/{sample}.txt", sample = SAMPLES), 
         expand("results/srww_exome_{interval}.vcf", interval = config['INTERVALS']), 
         "results/srww_exome_allChr.vcf", 
-        "results/srww_exome_allChr.maf05.vcf"
+        "results/srww_exome_allChr.mm90.maf05.ld95.vcf"
 
 rule fastqc_raw:
     input:
@@ -220,11 +220,21 @@ rule filter_merged_vcf:
     input:
         "results/srww_exome_allChr.vcf"
     output:
-        "results/srww_exome_allChr.maf05.vcf"
+        "results/srww_exome_allChr.mm90.maf05.vcf"
     params:
-        prefix = "results/srww_exome_allChr.maf05"
+        maxmissing = "0.9", 
+        maf = "0.05"
     log:
         "logs/filter_merged_vcf.log"
     shell:
-        "vcftools --vcf {input} --maf 0.05 --out {params.prefix} 2> {log}"
+        "vcftools --vcf {input} --max-missing {params.maxmissing} --maf {params.maf} --recode --stdout > {output} 2> {log}"
 
+rule ld_thin:
+    input:
+        "results/srww_exome_allChr.mm90.maf05.vcf"
+    output:
+        "results/srww_exome_allChr.mm90.maf05.ld95.vcf"
+    log:
+        "logs/ld_thin_vcf.log"
+    shell:
+        "bcftools +prune -m 0.95 -w 1Mb {input} -Ov -o {output} 2> {log}"
