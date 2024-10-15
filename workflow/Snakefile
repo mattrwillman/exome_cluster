@@ -221,8 +221,10 @@ rule filter_merged_vcf:
         "results/srww_exome_allChr.vcf"
     output:
         "results/srww_exome_allChr.maf05.vcf"
+    params:
+        prefix = "results/srww_exome_allChr.maf05"
     log:
         "logs/filter_merged_vcf.log"
     shell:
-        "vcftools --vcf {input} --maf 0.05 --out {output} 2> {log}"
+        "vcftools --vcf {input} --maf 0.05 --out {params.prefix} 2> {log}"
 
