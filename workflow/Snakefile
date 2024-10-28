@@ -10,8 +10,8 @@ SAMPLES = wildcards.sample
 
 REF_GENOTYPE = config['REF_GENOTYPE']
 REF_FASTA = config['REF_FASTA']
-REF_DICT = os.path.splitext(REF_FASTA)[0] + '.dict'
-REF_FAI = REF_FASTA + '.fai'
+# REF_DICT = os.path.splitext(REF_FASTA)[0] + '.dict'
+# REF_FAI = REF_FASTA + '.fai'
 FASTQ_DIR = config['FASTQ_DIR']
 PICARD_JAR = config['PICARD_JAR']
 GATK_SIF = config['GATK_SIF']
@@ -122,7 +122,8 @@ rule create_sequence_dictionary:
     input:
         REF_FASTA
     output:
-        REF_DICT
+        expand("resources/idx/{ref}.dict", ref = REF_GENOTYPE)
+#        REF_DICT
     params:
         picard = PICARD_JAR
     shell:
@@ -132,15 +133,18 @@ rule create_fasta_index:
     input:
         ref = REF_FASTA
     output:
-        fai = REF_FAI
+        fai = expand("resources/idx/{ref}.fai", ref = REF_GENOTYPE)
+        #fai = REF_FAI
     shell:
         "samtools faidx {input}"
 
 rule haplotypecaller:
     input:
         ref = REF_FASTA, 
-        fai = REF_FAI, 
-        dict = REF_DICT, 
+        fai = expand("resources/idx/{ref}.fai", ref = REF_GENOTYPE), 
+        #fai = REF_FAI, 
+        dict = expand("resources/idx/{ref}.dict", ref = REF_GENOTYPE), 
+#        dict = REF_DICT, 
         bam = "results/alignment/{sample}.dedup.bam"
     output:
         "results/calls/{sample}.g.vcf"
