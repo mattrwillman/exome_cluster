@@ -10,8 +10,8 @@ SAMPLES = wildcards.sample
 
 REF_GENOTYPE = config['REF_GENOTYPE']
 REF_FASTA = config['REF_FASTA']
-# REF_DICT = os.path.splitext(REF_FASTA)[0] + '.dict'
-# REF_FAI = REF_FASTA + '.fai'
+REF_DICT = os.path.splitext(REF_FASTA)[0] + '.dict'
+REF_FAI = REF_FASTA + '.fai'
 FASTQ_DIR = config['FASTQ_DIR']
 PICARD_JAR = config['PICARD_JAR']
 GATK_SIF = config['GATK_SIF']
@@ -122,8 +122,7 @@ rule create_sequence_dictionary:
     input:
         REF_FASTA
     output:
-        expand("resources/idx/{ref}.dict", ref = REF_GENOTYPE)
-#        REF_DICT
+        REF_DICT
     params:
         picard = PICARD_JAR
     shell:
@@ -133,18 +132,15 @@ rule create_fasta_index:
     input:
         ref = REF_FASTA
     output:
-        fai = expand("resources/idx/{ref}.fai", ref = REF_GENOTYPE)
-        #fai = REF_FAI
+        fai = REF_FAI
     shell:
         "samtools faidx {input}"
 
 rule haplotypecaller:
     input:
         ref = REF_FASTA, 
-        fai = expand("resources/idx/{ref}.fai", ref = REF_GENOTYPE), 
-        #fai = REF_FAI, 
-        dict = expand("resources/idx/{ref}.dict", ref = REF_GENOTYPE), 
-#        dict = REF_DICT, 
+        fai = REF_FAI, 
+        dict = REF_DICT, 
         bam = "results/alignment/{sample}.dedup.bam"
     output:
         "results/calls/{sample}.g.vcf"
@@ -177,14 +173,14 @@ rule makedatabase:
     run:
         flagged_gvcf = ["--variant " + f for f in input.gvcf]
         shell("""
-            apptainer exec {params.gatk_sif} gatk --java-options "-Xmx1536g -Xms1500g" GenomicsDBImport {flagged_gvcf} \
+            apptainer exec {params.gatk_sif} gatk --java-options "-Xmx300g -Xms100g" GenomicsDBImport {flagged_gvcf} \
             --genomicsdb-workspace-path {output.db} -L {input.intervals} 2> {log}
         """)
 
 rule genotype:
     input:
         ref = REF_FASTA, 
-        dict = expand("resources/idx/{ref}.dict", ref = REF_GENOTYPE), 
+        dict = REF_DICT, 
         db = "results/db"
     output:
         "results/srww_exome_{interval}.vcf"
@@ -202,6 +198,7 @@ rule genotype:
             -L {wildcards.interval} \
             -O {output} 2> {log}
         """
+
 rule merge_vcfs:
     input:
         expand("results/srww_exome_{interval}.vcf", interval = config['INTERVALS'])
@@ -242,3 +239,4 @@ rule ld_thin:
         "logs/ld_thin_vcf.log"
     shell:
         "bcftools +prune -m 0.95 -w 1Mb {input} -Ov -o {output} 2> {log}"
+
